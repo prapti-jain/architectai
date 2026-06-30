@@ -1,114 +1,116 @@
 # ArchitectAI
 
-**AI-powered system design simulator with failure cascade simulation and traffic modeling**
+**AI-powered system design simulator with live failure cascade and traffic simulation**
 
-Built by **Prapti**
+Built by [Prapti](https://github.com/prapti-jain)
 
-![Next.js](https://img.shields.io/badge/Next.js-14-black)
-![FastAPI](https://img.shields.io/badge/FastAPI-0.115-green)
-![TypeScript](https://img.shields.io/badge/TypeScript-5.6-blue)
-![Python](https://img.shields.io/badge/Python-3.11-yellow)
-![React Flow](https://img.shields.io/badge/React_Flow-v12-purple)
-![Gemini AI](https://img.shields.io/badge/Gemini_AI-Google-blue)
+ArchitectAI generates a live, animated system architecture from a single prompt, then lets you stress-test it. Type "Design Twitter," watch a real architecture appear on a canvas, click any node to simulate it failing, or crank up traffic to see which components degrade first.
+
+![Next.js](https://img.shields.io/badge/Next.js-14-black) ![TypeScript](https://img.shields.io/badge/TypeScript-5-blue) ![FastAPI](https://img.shields.io/badge/FastAPI-0.115-009688) ![Python](https://img.shields.io/badge/Python-3.11-3776AB) ![Gemini](https://img.shields.io/badge/Gemini-2.0--flash-8E75B2) ![React Flow](https://img.shields.io/badge/React%20Flow-12-FF0072)
 
 ---
 
-## Features
+## Overview
 
-### 1. Failure Cascade Engine
-Click any node to simulate it going down. The system uses **BFS on the dependency graph** to propagate failures to all downstream services, turning them red in sequence with a realistic 300ms delay between each node. A node only goes fully down when **all** of its upstream dependencies are down — real graph traversal, not visual toggling.
+![ArchitectAI overview](docs/screenshots/01-overview.png)
 
-### 2. Traffic Simulation
-A slider controls requests/sec (0–100K). As traffic increases, nodes show load indicator bars and transition from green (healthy) → yellow (degraded at 70% capacity) → red (overloaded at 90% capacity). Load propagates through the graph proportionally to edge throughput — queuing theory in action.
+Type any system name and ArchitectAI calls Gemini to generate a structured architecture: nodes, edges, scale numbers, and engineering tradeoffs. Every generated system renders on an interactive canvas with custom node types for load balancers, services, databases, caches, and queues.
 
-### 3. Side-by-Side Architecture Comparison
-Generate two different architectures for the same system (e.g. SQL vs NoSQL approach). The app scores each on 5 axes — **latency, scalability, consistency, cost, complexity** — with winners highlighted per axis. Scores are derived from the AI response, not hardcoded. Choose from preset variant pairs (SQL vs NoSQL, Monolith vs Microservices, Synchronous vs Event-driven) and get an AI-generated tradeoff summary.
+This isn't a static diagram tool. Two engineering features sit underneath the visuals:
 
-### 4. Scale Q&A Chat
-Ask contextual questions about the current architecture in the sidebar chat panel. Gemini answers with 2–4 sentences referencing actual node names from your diagram — e.g. "How would you handle 10x traffic?" or "What's the single point of failure?"
+## Failure cascade simulation
 
-### 5. Export to PNG
-One-click export of the architecture diagram as a high-resolution PNG. Captures the React Flow viewport with the dark theme and node colors preserved, excluding UI chrome (controls, minimap).
+![Failure cascade](docs/screenshots/02-failure-cascade.png)
+
+Click any node and the app runs a breadth-first search across the dependency graph to determine which downstream services go fully down versus which are only degraded. Nodes animate into failure state with a staggered delay, so cascading outages are visible as they propagate — the same way an incident actually unfolds.
+
+## Traffic load simulation
+
+![Traffic simulation](docs/screenshots/03-traffic-simulation.png)
+
+A requests-per-second slider drives a load model across the graph. Entry nodes absorb full traffic and distribute it downstream proportionally through their edges. Each node has a configured capacity; cross 70% and it shows degraded, cross 90% and it's critical. The system health indicator reflects the worst node in the graph in real time.
+
+## AI architecture comparison
+
+![Architecture comparison](docs/screenshots/04-comparison.png)
+
+Generate two variants of the same system — SQL vs NoSQL, monolith vs microservices, synchronous vs event-driven — and compare them side by side on five axes: latency, scalability, consistency, cost, and complexity. A third Gemini call summarizes the tradeoff in plain language.
+
+## Scale Q&A
+
+Ask follow-up questions about the currently generated architecture — "how would you handle 10x traffic?", "what's the single point of failure?" — and get answers grounded in the actual nodes and edges on screen, not generic advice.
 
 ---
 
-## Tech Stack
+## How it works
 
-| Layer | Technology |
-|-------|-----------|
-| Frontend | Next.js 14, TypeScript, Tailwind CSS |
-| Diagram Engine | @xyflow/react (React Flow v12) |
-| UI Components | shadcn/ui patterns, custom dark theme |
-| Backend | FastAPI, Python 3.11 |
-| AI | Google Gemini (google-genai SDK) |
-| State | In-memory / React state (no DB) |
+| Layer | What it does |
+|---|---|
+| Generation | `POST /api/generate` sends a structured prompt to Gemini 2.0 Flash, which returns a JSON graph (nodes, edges, scale numbers, tradeoffs, scores). Retried with exponential backoff on rate limits. |
+| Failure cascade | `graphEngine.ts` builds a forward adjacency list from the edge data and runs BFS from the clicked node to determine cascade order and which nodes lose all upstream sources. |
+| Traffic simulation | `simulationEngine.ts` propagates a requests/sec value through the graph proportional to edge throughput, comparing each node's load against its configured capacity. |
+| Comparison | Two `/api/generate` calls run in parallel for each variant, followed by a `/api/compare-summary` call that sends a compacted graph summary (not full JSON) to keep the prompt small under rate limits. |
+| Scale Q&A | `/api/ask` passes the current graph as context alongside the user's question, so answers reference real node names instead of generic system design advice. |
 
----
+## Tech stack
 
-## How to Run
+**Frontend** — Next.js 14, TypeScript, Tailwind CSS, [@xyflow/react](https://reactflow.dev) (React Flow v12), html-to-image for PNG export
 
-### Backend (port 8000)
+**Backend** — FastAPI, Python, [google-genai](https://github.com/googleapis/python-genai) SDK, Gemini 2.0 Flash
+
+## Running locally
+
+Requires Node 18+, Python 3.11+, and a [Gemini API key](https://aistudio.google.com/apikey).
 
 ```bash
+git clone git@github.com:prapti-jain/architectai.git
+cd architectai
+```
+
+**Backend**
+```bash
 cd backend
-python -m venv .venv
-source .venv/bin/activate        # Windows: .venv\Scripts\activate
+python3 -m venv .venv
+source .venv/bin/activate
 pip install -r requirements.txt
+echo "GEMINI_API_KEY=your_key_here" > .env
 uvicorn main:app --reload --port 8000
 ```
 
-### Frontend (port 3000)
-
+**Frontend** — in a second terminal
 ```bash
 cd frontend
 npm install
+echo "NEXT_PUBLIC_API_URL=http://localhost:8000" > .env.local
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000)
-
----
-
-## Architecture
-
-```
-User Prompt
-    │
-    ▼
-PromptBar ──POST──▶ FastAPI /api/generate ──▶ Claude (Session 2) / Mock
-    │                        │
-    ▼                        ▼
-ArchCanvas ◀── ArchGraph ── Sidebar (scores, tradeoffs, scale)
-    │
-    ├── graphEngine.ts    → BFS failure cascade
-    ├── simulationEngine.ts → traffic flow propagation
-    └── useFailureCascade / useSimulation hooks
+Or from the project root, once both `.env` files are in place:
+```bash
+./start.sh
 ```
 
-**Key engineering decisions:**
+Open `localhost:3000`, type a system name, and hit Generate.
 
-- **BFS failure cascade** with upstream dependency tracking — nodes degrade partially when losing one input, go fully down when losing all inputs
-- **Proportional load distribution** across edges based on configured throughput values
-- **Layered node positioning** enforced in the AI system prompt (clients y=80, LBs y=220, services y=380, data y=540)
-- **3-line Claude integration swap** in `backend/main.py` — mock stub today, real API in Session 2
+## Project structure
 
----
+```
+architectai/
+├── frontend/
+│   ├── app/                  # Next.js app router
+│   ├── components/           # Canvas, sidebar, node types, chat, compare panel
+│   ├── hooks/                 # useArchitecture, useFailureCascade, useSimulation, useScaleChat
+│   └── lib/
+│       ├── graphEngine.ts     # BFS failure cascade
+│       ├── simulationEngine.ts # traffic load propagation
+│       └── types.ts
+├── backend/
+│   ├── main.py                # FastAPI app, Gemini integration
+│   ├── prompts/                # system design prompt templates
+│   └── models/                 # Pydantic schemas
+└── start.sh                    # runs both services
+```
 
-## Environment Variables
+## What this project is not
 
-| File | Variable | Purpose |
-|------|----------|---------|
-| `backend/.env` | `GEMINI_API_KEY` | Google Gemini API key |
-| `frontend/.env.local` | `NEXT_PUBLIC_API_URL` | Backend URL (default: `http://localhost:8000`) |
-
----
-
-## Screenshots
-
-> _Coming soon — add screenshots of the WhatsApp architecture, failure cascade, and traffic simulation here._
-
----
-
-## License
-
-MIT — Built as a portfolio project by Prapti.
+This isn't a wrapper around a single prompt. The architecture generation is one of five engineering pieces — the other four (failure cascade traversal, load simulation, multi-call comparison with retry logic, and context-grounded Q&A) are deterministic code that runs independently of the LLM call. The AI generates the architecture; the simulation engines reason about it.
