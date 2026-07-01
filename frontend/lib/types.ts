@@ -18,7 +18,7 @@ export interface ArchNode {
   capacity: number
   position: { x: number; y: number }
   status: 'healthy' | 'degraded' | 'down'
-  currentLoad: number
+  currentLoad?: number
 }
 
 export interface ArchEdge {

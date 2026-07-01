@@ -6,7 +6,6 @@ import { ArchNode, NodeType } from '@/lib/types'
 import { NODE_COLORS, getLoadColor, getStatusBorder } from './nodeStyles'
 
 export interface NodeData extends ArchNode {
-  currentLoad?: number
   isFailed?: boolean
   isAffected?: boolean
   showLoad?: boolean
@@ -14,7 +13,7 @@ export interface NodeData extends ArchNode {
 }
 
 function BaseNodeComponent({ data, type: nodeTypeKey }: NodeProps) {
-  const data_ = data as NodeData
+  const data_ = data as unknown as NodeData
   const nodeType = (data_.type ?? nodeTypeKey) as NodeType
   const colors = NODE_COLORS[nodeType] ?? NODE_COLORS[NodeType.SERVICE]
   const load = data_.currentLoad ?? 0
