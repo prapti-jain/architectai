@@ -41,9 +41,16 @@ client = get_gemini_client()
 
 app = FastAPI(title="ArchitectAI", version="0.1.0")
 
+DEFAULT_CORS_ORIGINS = "http://localhost:3000,https://architectai-y9wy.vercel.app"
+CORS_ORIGINS = [
+    origin.strip()
+    for origin in os.getenv("CORS_ORIGINS", DEFAULT_CORS_ORIGINS).split(",")
+    if origin.strip()
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=CORS_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
